@@ -1,0 +1,47 @@
+{
+  "name": "@sociahive/sdk",
+  "version": "0.1.0",
+  "description": "Official Node.js SDK for the SociaHive API — social media management, automation flows, and analytics.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sociahive/sociahive-node.git"
+  },
+  "homepage": "https://www.sociahive.com/mcp",
+  "keywords": [
+    "sociahive",
+    "social-media",
+    "instagram",
+    "automation",
+    "scheduler",
+    "mcp"
+  ],
+  "main": "dist/index.cjs",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "generate:types": "openapi-typescript https://www.sociahive.com/api/v1/openapi.json -o src/generated.ts",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0"
+  }
+}
