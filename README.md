@@ -40,7 +40,7 @@ const sh = new SociaHive({ oauthToken: 'sh_at_…' })
 
 Generate API keys at <https://www.sociahive.com/settings?tab=api-keys>. For
 OAuth flows, see the OAuth quickstart in
-[the developer quickstart](https://github.com/sociahive/sociahive/blob/main/docs/MCP/index.md#2b-developer-quickstart).
+[the developer quickstart](https://docs.sociahive.com/developer-quickstart).
 
 ## What's covered
 
