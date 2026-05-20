@@ -7,7 +7,10 @@
     "type": "git",
     "url": "https://github.com/sociahive/sociahive-node.git"
   },
-  "homepage": "https://www.sociahive.com/mcp",
+  "homepage": "https://docs.sociahive.com",
+  "bugs": {
+    "url": "https://github.com/sociahive/sociahive-node/issues"
+  },
   "keywords": [
     "sociahive",
     "social-media",
@@ -16,14 +19,14 @@
     "scheduler",
     "mcp"
   ],
-  "main": "dist/index.cjs",
+  "main": "dist/index.js",
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "require": "./dist/index.js"
     }
   },
   "files": [
@@ -38,6 +41,9 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "devDependencies": {
     "openapi-typescript": "^7.0.0",
