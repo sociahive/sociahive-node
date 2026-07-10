@@ -301,8 +301,23 @@ export class SociaHive {
      * Update the Brand Kit that grounds every generated post. Requires
      * `autopilot:write`.
      */
-    updateBrandKit: (input: AutopilotBrandKitInput): Promise<AutopilotBrandKitResult> =>
-      this.request('PUT', '/autopilot/brand-kit', input),
+    updateBrandKit: (input: AutopilotBrandKitInput): Promise<AutopilotBrandKitResult> => {
+      // The API body is snake_case with a nested, required `voice` object.
+      // Map the ergonomic camelCase input to that shape (sending camelCase
+      // hits the strict server schema and 400s).
+      const body: Record<string, unknown> = {
+        voice: {
+          preset: input.voicePreset,
+          ...(input.voiceNote !== undefined ? { custom_note: input.voiceNote } : {}),
+        },
+      }
+      if (input.businessName !== undefined) body.business_name = input.businessName
+      if (input.whatYouDo !== undefined) body.what_you_do = input.whatYouDo
+      if (input.audience !== undefined) body.audience = input.audience
+      if (input.bannedWords !== undefined) body.banned_words = input.bannedWords
+      if (input.contentPillars !== undefined) body.pillars = input.contentPillars
+      return this.request('PUT', '/autopilot/brand-kit', body)
+    },
     /**
      * Approve the reviewed week and schedule it for publishing. IRREVERSIBLE —
      * the posts go live at their planned times. The API returns

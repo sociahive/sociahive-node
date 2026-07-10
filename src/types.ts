@@ -188,11 +188,17 @@ export interface AutopilotAdjustResult {
   [key: string]: unknown
 }
 
+/** Brand voice presets accepted by the API (`voice.preset`). */
+export type BrandVoicePreset = 'warm' | 'expert' | 'playful'
+
 export interface AutopilotBrandKitInput {
   businessName?: string
   whatYouDo?: string
   audience?: string
-  voicePreset?: string
+  /** Required by the API — maps to `voice.preset`. */
+  voicePreset: BrandVoicePreset
+  /** Optional free-text voice note — maps to `voice.custom_note`. */
+  voiceNote?: string
   bannedWords?: string[]
   contentPillars?: string[]
 }
