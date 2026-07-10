@@ -49,11 +49,54 @@ OAuth flows, see the OAuth quickstart in
 | `accounts` | `list` |
 | `posts` | `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk` |
 | `flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `addNode`, `updateNode`, `addEdge`, `stats`, `collectedData`, `generate` |
+| `autopilot` | `status`, `generate`, `adjust`, `updateBrandKit`, `approve`, `turnOn` |
 | `analytics` | `get`, `export` |
 
 For endpoints not surfaced here, drop down to the raw HTTP client or hit the
 endpoint via `fetch` with `X-API-Key`. The full OpenAPI spec is at
 <https://www.sociahive.com/api/v1/openapi.json>.
+
+## Autopilot
+
+Autopilot plans, writes, and schedules a full week of on-brand posts for your
+connected accounts. Reads need an API key with the `autopilot:read` scope
+(`status`); every write needs `autopilot:write` (`generate`, `adjust`,
+`updateBrandKit`, `approve`, `turnOn`).
+
+```ts
+// Check status, then generate the upcoming week.
+const status = await sh.autopilot.status()
+if (status.enabled) await sh.autopilot.generate()
+
+// Steer a re-generation.
+await sh.autopilot.adjust({ feedback: 'More product shots, fewer memes.' })
+
+// Ground generation in your brand.
+await sh.autopilot.updateBrandKit({
+  businessName: 'Acme Coffee',
+  whatYouDo: 'Small-batch roastery and café',
+  audience: 'Local coffee lovers',
+  contentPillars: ['brewing tips', 'new roasts', 'behind the bar'],
+})
+```
+
+`approve` and `turnOn` are **irreversible go-live actions** — approved posts are
+scheduled to publish and turning Autopilot on starts the weekly sweep. The API
+rejects both with `400 confirmation_required` unless you opt in, so `confirm` is
+a required argument on each:
+
+```ts
+// Approve the reviewed week — the posts WILL go live at their planned times.
+await sh.autopilot.approve({ confirm: true })
+
+// Turn Autopilot on (2 accounts, 7 posts/week, review each week before it ships).
+await sh.autopilot.turnOn({
+  postsPerWeek: 7,
+  reviewMode: 'approve',
+  accountIds: [accounts[0].id, accounts[1].id],
+  confirm: true,
+})
+```
 
 ## Errors
 

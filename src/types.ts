@@ -161,3 +161,77 @@ export interface ListFlowsQuery {
   limit?: number
   offset?: number
 }
+
+export type AutopilotReviewMode = 'approve' | 'autopublish'
+
+export interface AutopilotStatus {
+  enabled: boolean
+  configured: boolean
+  review_mode: AutopilotReviewMode
+  posts_per_week: number
+  account_ids: string[]
+  paused_reason?: string | null
+  last_generated_at?: string | null
+  [key: string]: unknown
+}
+
+export interface AutopilotGenerateResult {
+  week_start: string
+  batch_id: string
+  generating: boolean
+  [key: string]: unknown
+}
+
+export interface AutopilotAdjustResult {
+  week_start: string
+  generating: boolean
+  [key: string]: unknown
+}
+
+export interface AutopilotBrandKitInput {
+  businessName?: string
+  whatYouDo?: string
+  audience?: string
+  voicePreset?: string
+  bannedWords?: string[]
+  contentPillars?: string[]
+}
+
+export interface AutopilotBrandKit {
+  business_name?: string
+  what_you_do?: string
+  audience?: string
+  voice_preset?: string
+  banned_words?: string[]
+  content_pillars?: string[]
+  [key: string]: unknown
+}
+
+export interface AutopilotBrandKitResult {
+  ok: boolean
+  brand_kit: AutopilotBrandKit
+  [key: string]: unknown
+}
+
+export interface AutopilotApproveResult {
+  ok: boolean
+  scheduled: number
+  failed: number
+  [key: string]: unknown
+}
+
+export interface AutopilotTurnOnConfig {
+  enabled: boolean
+  review_mode: AutopilotReviewMode
+  posts_per_week: number
+  account_ids: string[]
+  [key: string]: unknown
+}
+
+export interface AutopilotTurnOnResult {
+  ok: boolean
+  enabled: boolean
+  clamped: boolean
+  config: AutopilotTurnOnConfig
+  [key: string]: unknown
+}

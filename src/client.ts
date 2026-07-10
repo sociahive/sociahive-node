@@ -21,6 +21,14 @@ import type {
   ListFlowsQuery,
   Paginated,
   Platform,
+  AutopilotStatus,
+  AutopilotGenerateResult,
+  AutopilotAdjustResult,
+  AutopilotBrandKitInput,
+  AutopilotBrandKitResult,
+  AutopilotApproveResult,
+  AutopilotReviewMode,
+  AutopilotTurnOnResult,
 } from './types'
 
 export interface SociaHiveOptions {
@@ -266,6 +274,64 @@ export class SociaHive {
       platform_user_id: string
       platform?: Platform
     }): Promise<Flow> => this.requestUnwrapped('POST', '/flows/generate', input),
+  }
+
+  // ── autopilot ───────────────────────────────────────────────────────
+
+  readonly autopilot = {
+    /**
+     * Current Autopilot config + status. Requires an `autopilot:read` API key.
+     */
+    status: (): Promise<AutopilotStatus> =>
+      this.request('GET', '/autopilot/config'),
+    /**
+     * Kick off generation of the upcoming week's batch. Returns 202 while the
+     * work runs in the background. Requires `autopilot:write`.
+     */
+    generate: (): Promise<AutopilotGenerateResult> =>
+      this.request('POST', '/autopilot/generate'),
+    /**
+     * Re-generate the current week's batch, optionally with steering feedback
+     * ("more product shots, fewer memes"). Returns 202. Requires
+     * `autopilot:write`.
+     */
+    adjust: (opts?: { feedback?: string }): Promise<AutopilotAdjustResult> =>
+      this.request('POST', '/autopilot/adjust', opts ?? {}),
+    /**
+     * Update the Brand Kit that grounds every generated post. Requires
+     * `autopilot:write`.
+     */
+    updateBrandKit: (input: AutopilotBrandKitInput): Promise<AutopilotBrandKitResult> =>
+      this.request('PUT', '/autopilot/brand-kit', input),
+    /**
+     * Approve the reviewed week and schedule it for publishing. IRREVERSIBLE —
+     * the posts go live at their planned times. The API returns
+     * `400 confirmation_required` unless `confirm: true` is passed, so `confirm`
+     * is required here. Requires `autopilot:write`.
+     */
+    approve: (opts: { batchId?: string; confirm: boolean }): Promise<AutopilotApproveResult> =>
+      this.request('POST', '/autopilot/approve', {
+        ...(opts.batchId !== undefined && { batch_id: opts.batchId }),
+        confirm: opts.confirm,
+      }),
+    /**
+     * Turn Autopilot on for the account. IRREVERSIBLE go-live — once enabled the
+     * weekly sweep starts planning and (in `autopublish` mode) shipping posts.
+     * The API returns `400 confirmation_required` unless `confirm: true` is
+     * passed, so `confirm` is required here. Requires `autopilot:write`.
+     */
+    turnOn: (opts: {
+      postsPerWeek?: number
+      reviewMode?: AutopilotReviewMode
+      accountIds?: string[]
+      confirm: boolean
+    }): Promise<AutopilotTurnOnResult> =>
+      this.request('POST', '/autopilot/turn-on', {
+        ...(opts.postsPerWeek !== undefined && { posts_per_week: opts.postsPerWeek }),
+        ...(opts.reviewMode !== undefined && { review_mode: opts.reviewMode }),
+        ...(opts.accountIds !== undefined && { account_ids: opts.accountIds }),
+        confirm: opts.confirm,
+      }),
   }
 
   // ── analytics ───────────────────────────────────────────────────────
