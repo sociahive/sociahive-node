@@ -16,6 +16,10 @@ All notable changes to `@sociahive/sdk` are listed here. The format follows [Kee
 - `SociaHiveError.retryAfter`: seconds from the `Retry-After` header on a 429.
 - Unit tests (`npm test`).
 
+### Removed
+
+- Autopilot methods that were on main but never released; they will return when Autopilot is available to everyone.
+
 ## [0.1.0] - 2026-05-20
 
 First release on npm.
