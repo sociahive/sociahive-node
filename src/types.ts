@@ -157,9 +157,27 @@ export interface ListPostsQuery {
 }
 
 export interface ListFlowsQuery {
-  platform_user_id?: string
-  limit?: number
-  offset?: number
+  /** Required. The connected account's `platform_user_id` (from `accounts.list()`). */
+  platform_user_id: string
+}
+
+/**
+ * Body of `posts.bulk()`: one action applied to up to 50 existing posts.
+ * - `schedule` needs `scheduled_for` (ISO 8601) and takes an optional `timezone`
+ * - `delete` deletes the posts
+ * - `update_status` needs `status` (`draft` or `scheduled`)
+ */
+export type BulkPostActionInput =
+  | { action: 'schedule'; post_ids: string[]; scheduled_for: string; timezone?: string }
+  | { action: 'delete'; post_ids: string[] }
+  | { action: 'update_status'; post_ids: string[]; status: 'draft' | 'scheduled' }
+
+/** Result of `posts.bulk()`: how many posts the action succeeded and failed on. */
+export interface BulkPostActionResult {
+  total: number
+  succeeded: number
+  failed: number
+  errors: Array<{ post_id: string; error: string }>
 }
 
 export type AutopilotReviewMode = 'approve' | 'autopublish'
@@ -195,9 +213,9 @@ export interface AutopilotBrandKitInput {
   businessName?: string
   whatYouDo?: string
   audience?: string
-  /** Required by the API — maps to `voice.preset`. */
+  /** Required by the API. Maps to `voice.preset`. */
   voicePreset: BrandVoicePreset
-  /** Optional free-text voice note — maps to `voice.custom_note`. */
+  /** Optional free-text voice note. Maps to `voice.custom_note`. */
   voiceNote?: string
   bannedWords?: string[]
   contentPillars?: string[]

@@ -1,5 +1,5 @@
 /**
- * Main SociaHive client. Constructed once and reused — keeps the OAuth/API-key
+ * Main SociaHive client. Constructed once and reused: keeps the OAuth/API-key
  * decision behind a single options object so callers don't have to think about
  * auth on every call.
  */
@@ -19,6 +19,8 @@ import type {
   AddEdgeInput,
   ListPostsQuery,
   ListFlowsQuery,
+  BulkPostActionInput,
+  BulkPostActionResult,
   Paginated,
   Platform,
   AutopilotStatus,
@@ -32,7 +34,7 @@ import type {
 } from './types'
 
 export interface SociaHiveOptions {
-  /** API key (sk_...) — pre-existing programmatic access. Use this OR oauthToken. */
+  /** API key (sk_...). Use this OR oauthToken. */
   apiKey?: string
   /** OAuth 2.1 bearer token from /api/oauth/token. Use this OR apiKey. */
   oauthToken?: string
@@ -71,7 +73,7 @@ export class SociaHive {
 
   /**
    * Unwrap `{ data: <object> }` envelopes for single-resource responses.
-   * Leaves paginated responses ({ data: [], pagination: {} }) alone — those
+   * Leaves paginated responses ({ data: [], pagination: {} }) alone; those
    * are returned to the caller as `Paginated<T>`.
    */
   private async requestUnwrapped<T>(
@@ -122,7 +124,9 @@ export class SociaHive {
         const errBody = (json ?? { error: text }) as { error?: string; error_description?: string }
         const code = errBody.error
         const message = errBody.error_description ?? errBody.error ?? `HTTP ${res.status}`
-        throw new SociaHiveError(message, res.status, json ?? text, code)
+        const retryHeader = Number(res.headers.get('retry-after'))
+        const retryAfter = Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : undefined
+        throw new SociaHiveError(message, res.status, json ?? text, code, retryAfter)
       }
       return (json as T) ?? (undefined as T)
     } catch (err) {
@@ -185,23 +189,26 @@ export class SociaHive {
       this.requestUnwrapped('POST', `/posts/${encodeURIComponent(id)}/publish`),
     cancel: (id: string): Promise<Post> =>
       this.requestUnwrapped('POST', `/posts/${encodeURIComponent(id)}/cancel`),
-    bulk: (posts: CreatePostInput[]): Promise<{ data: Post[] }> => {
-      const wirePosts = posts.map(({ text, media, ...rest }) => ({
-        ...rest,
-        content: media ? { text, media } : { text },
-      }))
-      return this.request('POST', '/posts/bulk', { posts: wirePosts })
+    /**
+     * Apply one action to up to 50 existing posts: schedule them, delete them,
+     * or set their status. It does not create posts; call `create()` for each.
+     */
+    bulk: async (input: BulkPostActionInput): Promise<BulkPostActionResult> => {
+      if (input.post_ids.length < 1 || input.post_ids.length > 50) {
+        throw new Error('@sociahive/sdk: posts.bulk takes 1 to 50 post_ids')
+      }
+      return this.requestUnwrapped('POST', '/posts/bulk', input)
     },
   }
 
   // ── flows ───────────────────────────────────────────────────────────
 
   readonly flows = {
-    list: async (q?: ListFlowsQuery): Promise<Paginated<Flow>> => {
+    list: async (q: ListFlowsQuery): Promise<Paginated<Flow>> => {
       // v1 quirk: this endpoint returns { flows: [...] } not { data: [...] }.
       // Normalize for SDK consumers so every list method looks the same.
       const raw = await this.request<{ flows?: Flow[]; data?: Flow[]; pagination?: Paginated<Flow>['pagination'] }>(
-        'GET', '/flows', undefined, q as Record<string, string | number | undefined>,
+        'GET', '/flows', undefined, { platform_user_id: q.platform_user_id },
       )
       const items = (raw.data ?? raw.flows ?? []).map((f) => normalizeId(f))
       return {
@@ -319,7 +326,7 @@ export class SociaHive {
       return this.request('PUT', '/autopilot/brand-kit', body)
     },
     /**
-     * Approve the reviewed week and schedule it for publishing. IRREVERSIBLE —
+     * Approve the reviewed week and schedule it for publishing. IRREVERSIBLE:
      * the posts go live at their planned times. The API returns
      * `400 confirmation_required` unless `confirm: true` is passed, so `confirm`
      * is required here. Requires `autopilot:write`.
@@ -330,7 +337,7 @@ export class SociaHive {
         confirm: opts.confirm,
       }),
     /**
-     * Turn Autopilot on for the account. IRREVERSIBLE go-live — once enabled the
+     * Turn Autopilot on for the account. IRREVERSIBLE go-live: once enabled the
      * weekly sweep starts planning and (in `autopublish` mode) shipping posts.
      * The API returns `400 confirmation_required` unless `confirm: true` is
      * passed, so `confirm` is required here. Requires `autopilot:write`.
@@ -376,7 +383,7 @@ function safeParseJson(text: string): unknown {
  * The v1 list endpoints (notably /flows) return `_id` (raw Mongo field) while
  * single-resource endpoints return both `_id` and `id`. Mirror Mongoose's
  * lean-with-id default for callers: if `id` is missing and `_id` is present,
- * surface `_id` under `id`. Shallow only — nested resources rarely need this.
+ * surface `_id` under `id`. Shallow only; nested resources rarely need this.
  */
 function normalizeId<T>(value: T): T {
   if (Array.isArray(value)) {

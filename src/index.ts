@@ -1,5 +1,5 @@
 /**
- * @sociahive/sdk — official Node.js client for the SociaHive API.
+ * @sociahive/sdk: official Node.js client for the SociaHive API.
  *
  * Thin ergonomic wrapper over fetch. Types for request/response payloads can be
  * regenerated from the live OpenAPI spec with `npm run generate:types`.

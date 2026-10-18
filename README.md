@@ -7,7 +7,8 @@
   </a>
 </p>
 
-<p align="center">The official Node.js SDK for the SociaHive API.</p>
+<p align="center">Run your social media from your AI tool: schedule posts, build DM and comment automations, and read analytics.</p>
+<p align="center">This is the official Node.js SDK for the SociaHive API.</p>
 
 <p align="center">
   <a href="https://www.sociahive.com">Website</a> ·
@@ -47,7 +48,7 @@ const post = await sh.posts.create({
   text: 'Hello from Node!',
   platforms: [{ platform: 'instagram', account_id: accounts[0].id }],
   schedule_type: 'scheduled',
-  scheduled_at: '2026-06-01T09:00:00Z',
+  scheduled_at: '2027-03-01T09:00:00Z', // any future time
   timezone: 'UTC',
 })
 console.log(`Scheduled post ${post.id}`)
@@ -62,7 +63,7 @@ Pass either an API key or an OAuth bearer token, not both:
 const sh = new SociaHive({ apiKey: 'sk_…' })
 
 // OAuth 2.1 token (from /api/oauth/token, scoped per user)
-const sh = new SociaHive({ oauthToken: 'sh_at_…' })
+const sh = new SociaHive({ oauthToken: 'mcp_at_…' })
 ```
 
 Generate API keys at <https://www.sociahive.com/settings?tab=api-keys>. For
@@ -77,6 +78,20 @@ OAuth flows, see the OAuth quickstart in
 | `posts` | `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk` |
 | `flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `addNode`, `updateNode`, `addEdge`, `stats`, `collectedData`, `generate` |
 | `analytics` | `get`, `export` |
+
+`flows.list` needs the account's `platform_user_id`:
+
+```ts
+const { data: flows } = await sh.flows.list({ platform_user_id: accounts[0].platform_user_id })
+```
+
+`posts.bulk` applies one action to up to 50 existing posts. It does not create posts; call `posts.create` for each one.
+
+```ts
+await sh.posts.bulk({ action: 'schedule', post_ids: ['p1', 'p2'], scheduled_for: '2027-03-01T09:00:00Z' })
+await sh.posts.bulk({ action: 'update_status', post_ids: ['p3'], status: 'draft' })
+await sh.posts.bulk({ action: 'delete', post_ids: ['p4'] })
+```
 
 For endpoints not surfaced here, drop down to the raw HTTP client or hit the
 endpoint via `fetch` with `X-API-Key`. The full OpenAPI spec is at
@@ -120,13 +135,17 @@ try {
 } catch (err) {
   if (err instanceof SociaHiveError) {
     if (err.isAuthError) console.error('Bad API key or insufficient scope')
-    else if (err.isRateLimited) console.error('Slow down, 1000 req/hr default')
+    else if (err.isRateLimited) console.error(`Rate limited, retry in ${err.retryAfter}s`)
     else console.error(`HTTP ${err.status}: ${err.message}`)
   } else {
     throw err
   }
 }
 ```
+
+## Rate limits
+
+Limits are per user, across all your keys: 120 reads and 30 writes a minute, 5 a minute for AI generation, and 1,000 requests a day in total. A `429` carries a `Retry-After` header; wait that long before retrying. See [rate limits](https://docs.sociahive.com/rate-limits).
 
 ## Configuration
 
@@ -169,10 +188,9 @@ Prefer to ask instead of writing code? The same account works from your AI tool 
 
 ## Data and permissions
 
+- An API key only reaches what its scopes allow (for example `posts:read`, `posts:write`, `flows:write`). Revoke a key any time in **Settings > API keys**.
 - Accounts connect through each platform's official login and APIs. SociaHive does not scrape and never asks for your account password (Bluesky uses an app password, Telegram a bot token).
-- Platform tokens are stored encrypted on SociaHive's servers. They are never sent to your AI tool and never returned by the API.
-- Access is limited to the scopes you grant: API key scopes (for example `posts:read`, `posts:write`, `flows:write`) or the permissions you approve at OAuth sign-in, where you can choose read-only access.
-- You can revoke access at any time: revoke a key in **Settings > API keys**, or disconnect an AI tool in **Settings > Connected apps**.
+- Platform tokens are stored encrypted on SociaHive's servers and are never returned by the API.
 
 ## Links
 

@@ -1,7 +1,7 @@
 {
   "name": "@sociahive/sdk",
   "version": "0.1.0",
-  "description": "Official Node.js SDK for the SociaHive API — social media management, automation flows, and analytics.",
+  "description": "Official Node.js SDK for the SociaHive API: post scheduling, DM and comment automations, and analytics.",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -36,6 +36,8 @@
   ],
   "scripts": {
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
     "generate:types": "openapi-typescript https://www.sociahive.com/api/v1/openapi.json -o src/generated.ts",
     "prepublishOnly": "npm run build"
   },
@@ -48,6 +50,7 @@
   "devDependencies": {
     "openapi-typescript": "^7.0.0",
     "tsup": "^8.0.0",
+    "tsx": "^4.23.15",
     "typescript": "^5.4.0"
   }
 }

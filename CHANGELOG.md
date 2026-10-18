@@ -2,6 +2,18 @@
 
 All notable changes to `@sociahive/sdk` are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `posts.bulk` now matches `POST /posts/bulk`: it takes `{ action, post_ids, ... }` (schedule, delete or update_status on up to 50 existing posts) and returns the counts. It used to send `{ posts: [...] }`, which the API refuses. **Breaking** for anyone calling the old signature; create posts with `posts.create` instead.
+- `flows.list` requires `platform_user_id` and no longer accepts `limit` / `offset`, which the API refuses.
+
+### Added
+
+- `SociaHiveError.retryAfter`: seconds from the `Retry-After` header on a 429.
+- Unit tests (`npm test`).
+
 ## [0.1.0] - 2026-05-20
 
 First release on npm.
