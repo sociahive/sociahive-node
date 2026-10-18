@@ -25,7 +25,7 @@
 
 # @sociahive/sdk
 
-Official Node.js client for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, build and run DM and comment automations, run Autopilot and read analytics from your own code.
+Official Node.js client for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, build and run DM and comment automations and read analytics from your own code.
 
 API access is part of the 7-day trial and every paid plan. On the free plan the API answers `403 upgrade_required`.
 
@@ -76,7 +76,6 @@ OAuth flows, see the OAuth quickstart in
 | `accounts` | `list` |
 | `posts` | `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk` |
 | `flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `addNode`, `updateNode`, `addEdge`, `stats`, `collectedData`, `generate` |
-| `autopilot` | `status`, `generate`, `adjust`, `updateBrandKit`, `approve`, `turnOn` |
 | `analytics` | `get`, `export` |
 
 For endpoints not surfaced here, drop down to the raw HTTP client or hit the
@@ -109,48 +108,6 @@ endpoint via `fetch` with `X-API-Key`. The full OpenAPI spec is at
   <a href="https://www.sociahive.com/automation/telegram"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/telegram.svg" alt="Telegram" title="Telegram" width="24"></a>
 </p>
 
-## Autopilot
-
-Autopilot plans, writes, and schedules a full week of on-brand posts for your
-connected accounts. The Autopilot methods are on `main` and not in the published 0.1.0 yet. Reads need an API key with the `autopilot:read` scope
-(`status`); every write needs `autopilot:write` (`generate`, `adjust`,
-`updateBrandKit`, `approve`, `turnOn`).
-
-```ts
-// Check status, then generate the upcoming week.
-const status = await sh.autopilot.status()
-if (status.enabled) await sh.autopilot.generate()
-
-// Steer a re-generation.
-await sh.autopilot.adjust({ feedback: 'More product shots, fewer memes.' })
-
-// Ground generation in your brand.
-await sh.autopilot.updateBrandKit({
-  businessName: 'Acme Coffee',
-  whatYouDo: 'Small-batch roastery and café',
-  audience: 'Local coffee lovers',
-  contentPillars: ['brewing tips', 'new roasts', 'behind the bar'],
-})
-```
-
-`approve` and `turnOn` are **irreversible go-live actions**: approved posts are
-scheduled to publish and turning Autopilot on starts the weekly sweep. The API
-rejects both with `400 confirmation_required` unless you opt in, so `confirm` is
-a required argument on each:
-
-```ts
-// Approve the reviewed week. The posts WILL go live at their planned times.
-await sh.autopilot.approve({ confirm: true })
-
-// Turn Autopilot on (2 accounts, 7 posts/week, review each week before it ships).
-await sh.autopilot.turnOn({
-  postsPerWeek: 7,
-  reviewMode: 'approve',
-  accountIds: [accounts[0].id, accounts[1].id],
-  confirm: true,
-})
-```
-
 ## Errors
 
 Every non-2xx response throws a `SociaHiveError`:
@@ -176,7 +133,7 @@ try {
 ```ts
 new SociaHive({
   apiKey: 'sk_…',
-  baseUrl: 'https://staging.sociahive.com/api/v1', // for staging/test
+  baseUrl: 'https://www.sociahive.com/api/v1',     // default
   timeoutMs: 60000,                                 // default 30s
   fetch: customFetch,                               // override for testing
 })
