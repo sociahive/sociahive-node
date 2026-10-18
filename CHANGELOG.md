@@ -4,6 +4,8 @@ All notable changes to `@sociahive/sdk` are listed here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-18
+
 ### Fixed
 
 - `posts.bulk` now matches `POST /posts/bulk`: it takes `{ action, post_ids, ... }` (schedule, delete or update_status on up to 50 existing posts) and returns the counts. It used to send `{ posts: [...] }`, which the API refuses. **Breaking** for anyone calling the old signature; create posts with `posts.create` instead.
@@ -30,3 +32,4 @@ First release on npm.
 - CommonJS and ES module builds with type declarations. Node 18 or later.
 
 [0.1.0]: https://www.npmjs.com/package/@sociahive/sdk/v/0.1.0
+[0.2.0]: https://www.npmjs.com/package/@sociahive/sdk/v/0.2.0
