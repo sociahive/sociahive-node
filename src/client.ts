@@ -4,7 +4,23 @@
  * auth on every call.
  */
 
-import { SociaHiveError } from './errors'
+import {
+  Transport,
+  normalizeId,
+  type Query,
+} from './transport'
+import {
+  calendarResource,
+  clientInvitesResource,
+  linkClicksResource,
+  mediaResource,
+  plugsResource,
+  postingSlotsResource,
+  reviewLinksResource,
+  rssFeedsResource,
+  signaturesResource,
+  webhooksResource,
+} from './resources'
 import type {
   ConnectedAccount,
   Post,
@@ -24,6 +40,7 @@ import type {
   Paginated,
   Platform,
 } from './types'
+import type * as Api from './generated'
 
 export interface SociaHiveOptions {
   /** API key (sk_...). Use this OR oauthToken. */
@@ -41,10 +58,8 @@ export interface SociaHiveOptions {
 const DEFAULT_BASE_URL = 'https://www.sociahive.com/api/v1'
 
 export class SociaHive {
-  private readonly baseUrl: string
-  private readonly headers: Record<string, string>
-  private readonly timeoutMs: number
-  private readonly fetchImpl: typeof fetch
+  /** Low-level transport, for operations the resources below don't wrap yet. */
+  readonly http: Transport
 
   constructor(opts: SociaHiveOptions) {
     if (!opts.apiKey && !opts.oauthToken) {
@@ -53,91 +68,33 @@ export class SociaHive {
     if (opts.apiKey && opts.oauthToken) {
       throw new Error('@sociahive/sdk: pass only one of `apiKey` or `oauthToken`')
     }
-    this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, '')
-    this.timeoutMs = opts.timeoutMs ?? 30000
-    this.fetchImpl = opts.fetch ?? fetch
-    this.headers = opts.apiKey
-      ? { 'X-API-Key': opts.apiKey }
-      : { Authorization: `Bearer ${opts.oauthToken}` }
+    this.http = new Transport({
+      baseUrl: (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, ''),
+      timeoutMs: opts.timeoutMs ?? 30000,
+      fetch: opts.fetch ?? ((...args: Parameters<typeof fetch>) => fetch(...args)),
+      headers: opts.apiKey ? { 'X-API-Key': opts.apiKey } : { Authorization: `Bearer ${opts.oauthToken}` },
+    })
+    this.media = mediaResource(this.http)
+    this.signatures = signaturesResource(this.http)
+    this.postingSlots = postingSlotsResource(this.http)
+    this.reviewLinks = reviewLinksResource(this.http)
+    this.plugs = plugsResource(this.http)
+    this.linkClicks = linkClicksResource(this.http)
+    this.calendar = calendarResource(this.http)
+    this.clientInvites = clientInvitesResource(this.http)
+    this.rssFeeds = rssFeedsResource(this.http)
+    this.webhooks = webhooksResource(this.http)
   }
 
-  // ── HTTP primitive ──────────────────────────────────────────────────
-
-  /**
-   * Unwrap `{ data: <object> }` envelopes for single-resource responses.
-   * Leaves paginated responses ({ data: [], pagination: {} }) alone; those
-   * are returned to the caller as `Paginated<T>`.
-   */
-  private async requestUnwrapped<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-    query?: Record<string, string | number | undefined>,
-  ): Promise<T> {
-    const raw = await this.request<{ data?: T } & T>(method, path, body, query)
-    let result: unknown = raw
-    if (raw && typeof raw === 'object' && 'data' in raw && !('pagination' in raw)) {
-      const inner = (raw as { data: unknown }).data
-      if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
-        result = inner
-      }
-    }
-    return normalizeId(result) as T
+  private request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
+    return this.http.request<T>(method, path, body, query)
   }
 
-  private async request<T>(
-    method: string,
-    path: string,
-    body?: unknown,
-    query?: Record<string, string | number | undefined>,
-  ): Promise<T> {
-    const url = new URL(this.baseUrl + path)
-    if (query) {
-      for (const [k, v] of Object.entries(query)) {
-        if (v !== undefined && v !== null) url.searchParams.set(k, String(v))
-      }
-    }
-
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs)
-
-    try {
-      const res = await this.fetchImpl(url.toString(), {
-        method,
-        headers: { ...this.headers, 'Content-Type': 'application/json' },
-        body: body !== undefined ? JSON.stringify(body) : undefined,
-        signal: controller.signal,
-      })
-
-      const text = await res.text()
-      const json = text ? safeParseJson(text) : null
-
-      if (!res.ok) {
-        const errBody = (json ?? { error: text }) as { error?: string; error_description?: string }
-        const code = errBody.error
-        const message = errBody.error_description ?? errBody.error ?? `HTTP ${res.status}`
-        const retryHeader = Number(res.headers.get('retry-after'))
-        const retryAfter = Number.isFinite(retryHeader) && retryHeader > 0 ? retryHeader : undefined
-        throw new SociaHiveError(message, res.status, json ?? text, code, retryAfter)
-      }
-      return (json as T) ?? (undefined as T)
-    } catch (err) {
-      if (err instanceof SociaHiveError) throw err
-      if (err instanceof Error && err.name === 'AbortError') {
-        throw new SociaHiveError(`Request timed out after ${this.timeoutMs}ms`, 0, null, 'timeout')
-      }
-      throw new SociaHiveError(
-        err instanceof Error ? err.message : 'Unknown error',
-        0,
-        null,
-        'network_error',
-      )
-    } finally {
-      clearTimeout(timeout)
-    }
+  private requestUnwrapped<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
+    return this.http.requestUnwrapped<T>(method, path, body, query)
   }
 
-  // ── accounts ────────────────────────────────────────────────────────
+    // ── accounts ────────────────────────────────────────────────────────
 
   readonly accounts = {
     list: (platform?: Platform): Promise<{ data: ConnectedAccount[] }> =>
@@ -148,7 +105,7 @@ export class SociaHive {
 
   readonly posts = {
     list: (q?: ListPostsQuery): Promise<Paginated<Post>> =>
-      this.request('GET', '/posts', undefined, q as Record<string, string | number | undefined>),
+      this.request('GET', '/posts', undefined, q as Query),
     get: (id: string): Promise<Post> =>
       this.requestUnwrapped('GET', `/posts/${encodeURIComponent(id)}`),
     create: (input: CreatePostInput): Promise<Post> => {
@@ -181,6 +138,11 @@ export class SociaHive {
       this.requestUnwrapped('POST', `/posts/${encodeURIComponent(id)}/publish`),
     cancel: (id: string): Promise<Post> =>
       this.requestUnwrapped('POST', `/posts/${encodeURIComponent(id)}/cancel`),
+    delete: (id: string): Promise<void> =>
+      this.request('DELETE', `/posts/${encodeURIComponent(id)}`),
+    /** Copy a post as a new draft. */
+    duplicate: (id: string): Promise<Post> =>
+      this.requestUnwrapped('POST', `/posts/${encodeURIComponent(id)}/duplicate`),
     /**
      * Apply one action to up to 50 existing posts: schedule them, delete them,
      * or set their status. It does not create posts; call `create()` for each.
@@ -279,41 +241,39 @@ export class SociaHive {
 
   readonly analytics = {
     get: (q?: AnalyticsQuery): Promise<AnalyticsResponse> =>
-      this.request('GET', '/analytics', undefined, q as Record<string, string | number | undefined>),
+      this.request('GET', '/analytics', undefined, q as Query),
     export: (params: {
       type: 'posts' | 'flows' | 'accounts'
       format?: 'json' | 'csv'
       from?: string
       to?: string
     }): Promise<unknown> =>
-      this.request('GET', '/analytics/export', undefined, params as Record<string, string | number | undefined>),
+      this.request('GET', '/analytics/export', undefined, params as Query),
+    /** What has worked on your published posts (format, weekday, pillar) over the last `weeks` (1 to 12). */
+    contentInsights: (q: { weeks?: number } = {}): Promise<Api.ContentInsights> =>
+      this.requestUnwrapped('GET', '/analytics/content-insights', undefined, q as Query),
   }
-}
 
-function safeParseJson(text: string): unknown {
-  try {
-    return JSON.parse(text)
-  } catch {
-    return null
-  }
-}
+  // ── scheduler resources (typed from the OpenAPI spec) ──────────────
 
-/**
- * The v1 list endpoints (notably /flows) return `_id` (raw Mongo field) while
- * single-resource endpoints return both `_id` and `id`. Mirror Mongoose's
- * lean-with-id default for callers: if `id` is missing and `_id` is present,
- * surface `_id` under `id`. Shallow only; nested resources rarely need this.
- */
-function normalizeId<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map(normalizeId) as unknown as T
-  }
-  if (value && typeof value === 'object') {
-    const obj = value as Record<string, unknown>
-    if (obj.id === undefined && typeof obj._id === 'string') {
-      return { ...obj, id: obj._id } as T
-    }
-  }
-  return value
+  /** Media library, uploads and AI images. */
+  readonly media: ReturnType<typeof mediaResource>
+  /** Saved sign-offs appended to posts. */
+  readonly signatures: ReturnType<typeof signaturesResource>
+  /** Weekly posting times and find-slot. */
+  readonly postingSlots: ReturnType<typeof postingSlotsResource>
+  /** Client review links on a post. */
+  readonly reviewLinks: ReturnType<typeof reviewLinksResource>
+  /** Plugs: repost or comment when a post reaches a number. */
+  readonly plugs: ReturnType<typeof plugsResource>
+  /** Clicks on a post's short links. */
+  readonly linkClicks: ReturnType<typeof linkClicksResource>
+  /** Calendar month, duplicate and quick stats. */
+  readonly calendar: ReturnType<typeof calendarResource>
+  /** Client invite links that connect a client's accounts to an account group. */
+  readonly clientInvites: ReturnType<typeof clientInvitesResource>
+  /** RSS feeds that become drafts or scheduled posts. */
+  readonly rssFeeds: ReturnType<typeof rssFeedsResource>
+  /** Outbound webhook subscriptions. */
+  readonly webhooks: ReturnType<typeof webhooksResource>
 }
-

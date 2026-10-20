@@ -1,16 +1,20 @@
 /**
- * Hand-curated types for the most-used endpoints.
+ * Hand-curated types for the original posts / flows / analytics methods and
+ * for outbound webhooks (which the public spec types loosely).
  *
- * Source of truth is the OpenAPI spec at /api/v1/openapi.json; running
- * `npm run generate:types` regenerates `src/generated.ts` for fuller coverage.
- * The hand-curated types here are kept terse and stable so the public SDK
- * surface doesn't churn every time we tweak an internal response shape.
+ * Every other resource is typed from `src/generated.ts`, generated from the
+ * OpenAPI spec and exported as the `Api` namespace.
+ * The hand-curated types here stay terse and stable so the public SDK surface
+ * doesn't churn every time an internal response shape changes.
  */
 
-export type Platform =
-  | 'instagram' | 'facebook' | 'messenger' | 'whatsapp'
-  | 'linkedin' | 'twitter' | 'tiktok' | 'telegram'
-  | 'threads' | 'youtube' | 'bluesky' | 'pinterest'
+import type { Platform, BulkOperationResult, BulkPostActionRequest } from './generated'
+
+/**
+ * Platform ids: `KnownPlatform | (string & {})`. The public spec lists only
+ * public platforms, so new ids arrive as plain strings without a type error.
+ */
+export type { Platform, KnownPlatform } from './generated'
 
 export type PostStatus =
   | 'draft' | 'scheduled' | 'publishing' | 'published'
@@ -37,6 +41,23 @@ export interface MediaItem {
   type: MediaType
   url: string
   thumbnail_url?: string
+  /** Image description sent to platforms that take alt text (up to 1,000 characters). */
+  alt_text?: string
+  /** A video's chosen cover image (an https URL), where the platform takes one. */
+  cover_url?: string
+  /** Or the cover as a frame of the video, in milliseconds. */
+  cover_time_ms?: number
+}
+
+/** Per-platform changes to a post (`platform_overrides[platform]`). */
+export interface PlatformOverride {
+  text?: string
+  media?: MediaItem[]
+  /** The platform's copy no longer follows edits to the shared text. */
+  detached?: boolean
+  /** A signature id, or `'none'` for no signature on this platform. */
+  signature_id?: string
+  [key: string]: unknown
 }
 
 export interface PlatformTarget {
@@ -59,10 +80,12 @@ export interface Post {
 }
 
 export interface CreatePostInput {
-  /** Post body text. Up to 2200 chars. */
+  /** Post body text. Each platform's limit applies when the post is scheduled. */
   text: string
-  platforms: Array<{ platform: Platform; account_id: string }>
+  /** `metadata` carries platform options as flat string keys (e.g. `shorten_links: 'true'`). */
+  platforms: Array<{ platform: Platform; account_id: string; metadata?: Record<string, string> }>
   media?: MediaItem[]
+  platform_overrides?: Record<string, PlatformOverride>
   schedule_type: ScheduleType
   scheduled_at?: string
   timezone?: string
@@ -167,15 +190,67 @@ export interface ListFlowsQuery {
  * - `delete` deletes the posts
  * - `update_status` needs `status` (`draft` or `scheduled`)
  */
-export type BulkPostActionInput =
-  | { action: 'schedule'; post_ids: string[]; scheduled_for: string; timezone?: string }
-  | { action: 'delete'; post_ids: string[] }
-  | { action: 'update_status'; post_ids: string[]; status: 'draft' | 'scheduled' }
+export type BulkPostActionInput = BulkPostActionRequest
 
-/** Result of `posts.bulk()`: how many posts the action succeeded and failed on. */
-export interface BulkPostActionResult {
-  total: number
-  succeeded: number
-  failed: number
-  errors: Array<{ post_id: string; error: string }>
+/** Result of `posts.bulk()`: how many posts the action applied to. */
+export type BulkPostActionResult = BulkOperationResult
+
+// ── Outbound webhooks ───────────────────────────────────────────────
+
+/** Events a webhook can subscribe to. */
+export type WebhookEvent =
+  | 'post.published'
+  | 'post.failed'
+  | 'post.review_decision'
+  | 'post.plug_fired'
+  | 'flow.triggered'
+  | 'flow.completed'
+  | 'flow.error'
+  | 'message.received'
+  | 'comment.received'
+  | 'account.disconnected'
+  | 'whatsapp.template_status'
+  | (string & {})
+
+export type WebhookIntegrationType = 'webhook' | 'custom' | 'n8n' | 'make' | 'zapier'
+
+export interface WebhookSubscription {
+  id: string
+  target_url: string
+  events: WebhookEvent[]
+  integration_type: WebhookIntegrationType | (string & {})
+  active: boolean
+  account_ids: string[]
+  consecutive_failures: number
+  disabled_at: string | null
+  disabled_reason: string | null
+  last_delivery_at: string | null
+  last_status: number | null
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CreateWebhookInput {
+  /** Public HTTPS URL. */
+  target_url: string
+  events: WebhookEvent[]
+  integration_type?: WebhookIntegrationType
+  /** Only events about these connected accounts. Empty: every account. */
+  account_ids?: string[]
+}
+
+export interface UpdateWebhookInput {
+  target_url?: string
+  events?: WebhookEvent[]
+  account_ids?: string[]
+  active?: boolean
+}
+
+/** The JSON body SociaHive POSTs to a webhook. */
+export interface WebhookDelivery<D = Record<string, unknown>> {
+  id: string
+  event: WebhookEvent
+  timestamp: string
+  data: D
 }

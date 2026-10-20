@@ -26,7 +26,7 @@
 
 # @sociahive/sdk
 
-Official Node.js client for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, build and run DM and comment automations and read analytics from your own code.
+Official Node.js client for the [SociaHive](https://www.sociahive.com) API: schedule and publish posts, manage your media library, posting slots, signatures, client review links and plugs, build and run DM and comment automations, receive webhooks and read analytics from your own code.
 
 API access is part of the 7-day trial and every paid plan. On the free plan the API answers `403 upgrade_required`.
 
@@ -72,12 +72,24 @@ OAuth flows, see the OAuth quickstart in
 
 ## What's covered
 
-| Domain | Methods |
+| Resource | Methods |
 |---|---|
 | `accounts` | `list` |
-| `posts` | `list`, `get`, `create`, `update`, `schedule`, `publish`, `cancel`, `bulk` |
+| `posts` | `list`, `get`, `create`, `update`, `delete`, `schedule`, `publish`, `cancel`, `bulk`, `duplicate` |
+| `media` | `list` (media library), `upload` (presign, PUT and verify in one call), `presign`, `verify`, `uploadFromUrl`, `generateImage`, `imageAllowance` |
+| `signatures` | `list`, `create`, `update`, `delete` |
+| `postingSlots` | `list`, `create`, `update`, `delete`, `occurrences`, `findSlot` |
+| `linkClicks` | `get` |
+| `reviewLinks` | `list`, `create`, `revoke` |
+| `plugs` | `list`, `arm`, `delete` |
+| `calendar` | `month`, `duplicate`, `stats` |
+| `clientInvites` | `list`, `create`, `revoke` |
+| `rssFeeds` | `list`, `create`, `update`, `pause` |
+| `webhooks` | `list`, `create`, `update`, `delete` |
 | `flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `addNode`, `updateNode`, `addEdge`, `stats`, `collectedData`, `generate` |
-| `analytics` | `get`, `export` |
+| `analytics` | `get`, `export`, `contentInsights` |
+
+Some features depend on your plan: client review links, client invites and AI images need Studio or above, plugs need Creator or above. On a plan without the feature its calls throw a `SociaHiveError` with `status: 403`.
 
 `flows.list` needs the account's `platform_user_id`:
 
@@ -93,9 +105,22 @@ await sh.posts.bulk({ action: 'update_status', post_ids: ['p3'], status: 'draft'
 await sh.posts.bulk({ action: 'delete', post_ids: ['p4'] })
 ```
 
-For endpoints not surfaced here, drop down to the raw HTTP client or hit the
-endpoint via `fetch` with `X-API-Key`. The full OpenAPI spec is at
-<https://www.sociahive.com/api/v1/openapi.json>.
+Schedule into the next free posting slot:
+
+```ts
+const slot = await sh.postingSlots.findSlot({ accountIds: [accounts[0].id] })
+await sh.posts.create({
+  text: 'New arrivals are in',
+  platforms: [{ platform: accounts[0].platform, account_id: accounts[0].id }],
+  schedule_type: 'scheduled',
+  scheduled_at: slot.at,
+  timezone: slot.timezone,
+})
+```
+
+For an operation without a method, use the typed transport:
+`sh.http.call('GET /posts/{id}/link-clicks', { path: { id } })`. The full
+OpenAPI spec is at <https://www.sociahive.com/api/v1/openapi.json>.
 
 ## Platforms
 
@@ -112,6 +137,8 @@ endpoint via `fetch` with `X-API-Key`. The full OpenAPI spec is at
   <a href="https://www.sociahive.com/features/content-scheduler"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/bluesky.svg" alt="Bluesky" title="Bluesky" width="24"></a>&nbsp;&nbsp;
   <a href="https://www.sociahive.com/features/content-scheduler"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/pinterest.svg" alt="Pinterest" title="Pinterest" width="24"></a>
 </p>
+
+<p align="center">Also Telegram channels, Discord, Mastodon, Lemmy, Dev.to, Hashnode, WordPress and Listmonk.</p>
 
 ### Automate DMs and comments on
 
@@ -158,18 +185,37 @@ new SociaHive({
 })
 ```
 
-## Regenerating types from OpenAPI
+## Types
 
-The hand-written types in `src/types.ts` cover the high-traffic endpoints.
-For fuller coverage, regenerate from the live spec:
+Request and response types are generated from SociaHive's OpenAPI document
+into `src/generated.ts` and exported as the `Api` namespace:
 
-```bash
-npm run generate:types
+```ts
+import type { Api } from '@sociahive/sdk'
+
+type Slot = Api.FreeSlot
+type ArmBody = Api.BodyOf<'POST /posts/{id}/plugs'>
 ```
 
-This pulls <https://www.sociahive.com/api/v1/openapi.json> into
-`src/generated.ts`. Import from there for endpoints the hand-written types
-don't cover yet.
+Platform ids are `KnownPlatform | (string & {})`, so a platform added later
+still type-checks.
+
+## Webhooks
+
+`sh.webhooks.create({ target_url, events })` subscribes an HTTPS endpoint.
+`verifyWebhookSignature({ body, signature, secret })` checks the
+`X-SociaHive-Signature` header of a delivery (HMAC-SHA256 with a five-minute
+replay window). It uses Web Crypto, so it needs Node 20 or newer.
+
+```ts
+import { verifyWebhookSignature } from '@sociahive/sdk'
+
+const ok = await verifyWebhookSignature({
+  body: rawBody,
+  signature: req.headers['x-sociahive-signature'],
+  secret: process.env.SOCIAHIVE_WEBHOOK_SECRET!,
+})
+```
 
 ## Works with your AI tool
 

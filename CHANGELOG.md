@@ -4,21 +4,26 @@ All notable changes to `@sociahive/sdk` are listed here. The format follows [Kee
 
 ## [Unreleased]
 
-## [0.2.0] - 2026-10-18
+## [0.2.0] - 2026-10-20
+
+### Added
+
+- New resources: `media` (media library, uploads, AI images), `signatures`, `postingSlots` (with `findSlot`), `linkClicks`, `reviewLinks`, `plugs`, `calendar`, `clientInvites`, `rssFeeds` and `webhooks`.
+- `posts.delete`, `posts.duplicate` and `analytics.contentInsights`.
+- Request and response types generated from the OpenAPI spec (`src/generated.ts`), exported as the `Api` namespace.
+- `verifyWebhookSignature` checks the `X-SociaHive-Signature` header of a webhook delivery.
+- `SociaHiveError.retryAfter`: seconds from the `Retry-After` header on a 429.
+- The transport is public as `sh.http` (`call`, `raw`, `request`).
+
+### Changed
+
+- `Platform` is now `KnownPlatform | (string & {})`, so new platforms type-check.
+- `SociaHiveError.code` prefers the server's `code` field and falls back to `error`.
 
 ### Fixed
 
 - `posts.bulk` now matches `POST /posts/bulk`: it takes `{ action, post_ids, ... }` (schedule, delete or update_status on up to 50 existing posts) and returns the counts. It used to send `{ posts: [...] }`, which the API refuses. **Breaking** for anyone calling the old signature; create posts with `posts.create` instead.
 - `flows.list` requires `platform_user_id` and no longer accepts `limit` / `offset`, which the API refuses.
-
-### Added
-
-- `SociaHiveError.retryAfter`: seconds from the `Retry-After` header on a 429.
-- Unit tests (`npm test`).
-
-### Removed
-
-- Autopilot methods that were on main but never released; they will return when Autopilot is available to everyone.
 
 ## [0.1.0] - 2026-05-20
 
@@ -32,7 +37,6 @@ First release on npm.
 - `flows`: `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `addNode`, `updateNode`, `addEdge`, `stats`, `collectedData`, `generate`.
 - `analytics`: `get`, `export`.
 - `SociaHiveError` with `status`, `isAuthError` and `isRateLimited`.
-- Hand-written types, plus `npm run generate:types` to generate types from the OpenAPI spec.
 - CommonJS and ES module builds with type declarations. Node 18 or later.
 
 [0.1.0]: https://www.npmjs.com/package/@sociahive/sdk/v/0.1.0

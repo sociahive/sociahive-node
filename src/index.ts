@@ -1,8 +1,9 @@
 /**
  * @sociahive/sdk: official Node.js client for the SociaHive API.
  *
- * Thin ergonomic wrapper over fetch. Types for request/response payloads can be
- * regenerated from the live OpenAPI spec with `npm run generate:types`.
+ * Thin ergonomic wrapper over fetch. Request and response types of the
+ * scheduler resources are generated from SociaHive's OpenAPI spec and
+ * exported as the `Api` namespace.
  *
  * Quickstart:
  *
@@ -12,5 +13,9 @@
  */
 
 export { SociaHive } from './client'
+export type { SociaHiveOptions } from './client'
 export { SociaHiveError } from './errors'
+export { verifyWebhookSignature } from './webhook-signature'
+export type { Transport, CallArgs } from './transport'
+export type * as Api from './generated'
 export * from './types'
