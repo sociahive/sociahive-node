@@ -138,7 +138,7 @@ OpenAPI spec is at <https://www.sociahive.com/api/v1/openapi.json>.
   <a href="https://www.sociahive.com/features/content-scheduler"><img src="https://raw.githubusercontent.com/sociahive/.github/main/assets/platforms/pinterest.svg" alt="Pinterest" title="Pinterest" width="24"></a>
 </p>
 
-<p align="center">Also Telegram channels, Discord, Mastodon, Lemmy, Dev.to, Hashnode, WordPress and Listmonk.</p>
+<p align="center">Also Telegram channels, Discord, Slack, Mastodon, Lemmy, Tumblr, Dev.to, Hashnode, WordPress, Listmonk, Dribbble, Twitch and Kick.</p>
 
 ### Automate DMs and comments on
 

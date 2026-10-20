@@ -15,7 +15,7 @@ export type Error = {
 export type ConnectedAccount = {
   /** MongoDB ObjectId (24-character hex string) */
   id: string
-  /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`. Treat any other value as unknown, never as an error. */
+  /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`, `slack`, `tumblr`, `dribbble`, `twitch`, `kick`. Treat any other value as unknown, never as an error. */
   platform: string
   platform_user_id: string
   platform_username?: string
@@ -65,7 +65,7 @@ export type Post = {
   }[]
   status: "draft" | "scheduled" | "publishing" | "published" | "partially_published" | "failed" | "pending_approval" | "reminder_sent"
   platforms: {
-    /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`. Treat any other value as unknown, never as an error. */
+    /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`, `slack`, `tumblr`, `dribbble`, `twitch`, `kick`. Treat any other value as unknown, never as an error. */
     platform: string
     /** MongoDB ObjectId (24-character hex string) */
     account_id: string
@@ -91,7 +91,7 @@ export type Contact = {
   _id: string
   owner_user_id: string
   platform_identities: {
-    /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`. Treat any other value as unknown, never as an error. */
+    /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`, `slack`, `tumblr`, `dribbble`, `twitch`, `kick`. Treat any other value as unknown, never as an error. */
     platform: string
     platform_user_id: string
     username?: string
@@ -303,7 +303,7 @@ export type CreatePostRequest = {
     tags?: string[]
   }>
   platforms: {
-    /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`. Treat any other value as unknown, never as an error. */
+    /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`, `slack`, `tumblr`, `dribbble`, `twitch`, `kick`. Treat any other value as unknown, never as an error. */
     platform: string
     /** MongoDB ObjectId (24-character hex string) */
     account_id: string
@@ -517,7 +517,7 @@ export type LiveActivityRegistration = {
 export type MeFeedAccountHealth = {
   /** MongoDB ObjectId (24-character hex string) */
   id: string
-  /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`. Treat any other value as unknown, never as an error. */
+  /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`, `slack`, `tumblr`, `dribbble`, `twitch`, `kick`. Treat any other value as unknown, never as an error. */
   platform: string
   username: string | null
   /** Connected-account status — connected, disconnected, needs_reauth, expired, or pending_phone */
@@ -1313,7 +1313,7 @@ export interface Operations {
         tags?: string[]
       }>
       platforms?: {
-        /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`. Treat any other value as unknown, never as an error. */
+        /** Platform id. Known values: `instagram`, `messenger`, `whatsapp`, `linkedin`, `twitter`, `tiktok`, `telegram`, `threads`, `youtube`, `bluesky`, `pinterest`, `facebook`, `discord`, `mastodon`, `lemmy`, `devto`, `hashnode`, `wordpress`, `listmonk`, `slack`, `tumblr`, `dribbble`, `twitch`, `kick`. Treat any other value as unknown, never as an error. */
         platform: string
         /** MongoDB ObjectId (24-character hex string) */
         account_id: string

@@ -18,6 +18,7 @@ All notable changes to `@sociahive/sdk` are listed here. The format follows [Kee
 ### Changed
 
 - `Platform` is now `KnownPlatform | (string & {})`, so new platforms type-check.
+- The documented platform ids cover every public platform, including Telegram channels, Discord, Slack, Mastodon, Lemmy, Tumblr, Dev.to, Hashnode, WordPress, Listmonk, Dribbble, Twitch and Kick.
 - `SociaHiveError.code` prefers the server's `code` field and falls back to `error`.
 
 ### Fixed
