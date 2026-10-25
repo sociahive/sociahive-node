@@ -59,7 +59,7 @@ export function mediaResource(t: Transport) {
     /** Make up to 4 AI images from a description or a caption. They are added to the media library. */
     generateImage: (input: Api.GenerateImageRequest): Promise<Api.GenerateImageResponse> =>
       t.call('POST /media/generate-image', { body: input }),
-    /** AI images left this month. */
+    /** AI images made this month. Each image costs 5 AI credits. */
     imageAllowance: async (): Promise<Api.AiImageAllowance> =>
       (await t.call('GET /media/generate-image')).allowance,
   }

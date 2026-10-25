@@ -1,6 +1,6 @@
 {
   "name": "@sociahive/sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Official Node.js SDK for the SociaHive API: scheduling, media, posting slots, review links, plugs, webhooks, automation flows and analytics.",
   "license": "MIT",
   "repository": {

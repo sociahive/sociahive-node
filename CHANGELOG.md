@@ -4,6 +4,14 @@ All notable changes to `@sociahive/sdk` are listed here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-25
+
+### Changed
+
+- AI images cost 5 AI credits each instead of counting against a monthly allowance. `media.imageAllowance()` still returns `used` (images made this month); `limit` and `remaining` are `null` (no image limit), or `0` when the plan has no AI images.
+- `media.generateImage()` fails with HTTP 402 `credits_exhausted` when there are too few credits (it was 429 `allowance_exhausted`), and with 403 `not_included` when the plan has no AI images. Images that could not be made are refunded.
+- RSS feeds with `image: "ai"` use 5 AI credits per image; when credits run out, posts go without an image.
+
 ## [0.2.0] - 2026-10-20
 
 ### Added

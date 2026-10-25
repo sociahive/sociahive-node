@@ -770,10 +770,11 @@ export type Plug = {
 }
 
 export type AiImageAllowance = {
+  /** Images made this billing month. */
   used: number
-  /** Images per month on your plan; null is unlimited. */
+  /** Null: images are paid for in AI credits, with no image limit. 0: AI images are not included in your plan. */
   limit: number | null
-  /** Null is unlimited. */
+  /** Null: no image limit. 0: not included in your plan. */
   remaining: number | null
   /** When the count starts again. */
   resetAt: string
@@ -798,7 +799,7 @@ export type GenerateImageRequest = {
   fromCaption?: boolean
   /** square 1024×1024, portrait 1024×1536, landscape 1536×1024. */
   aspect: "square" | "portrait" | "landscape"
-  /** Options to make (default 1). Each uses one image of the allowance. */
+  /** Options to make (default 1). Each costs 5 AI credits. */
   count?: number
   /** Retry with the same id to get the first result instead of new images. */
   requestId?: string
@@ -806,7 +807,7 @@ export type GenerateImageRequest = {
 
 export type GenerateImageResponse = {
   images: GeneratedImage[]
-  /** Images that could not be made; they were not counted. */
+  /** Images that could not be made; their credits were refunded. */
   failed: number
   allowance: AiImageAllowance
 }
@@ -915,7 +916,7 @@ export type RssFeed = {
   /** `draft`: each new item becomes a draft of its text. `ai_draft`: AI writes the post, it lands as a draft for review. `ai_schedule`: AI writes the post and schedules it into the next free posting slot of the feed's accounts, so it publishes without review. When no slot is free in the next 14 days the post stays a draft and you are notified. */
   mode: "draft" | "ai_draft" | "ai_schedule"
   template: RssFeedTemplate
-  /** `feed`: the item's own image, when it has a public https one. `ai`: one AI image, counted against the plan's monthly AI image allowance (none once it is used up). */
+  /** `feed`: the item's own image, when it has a public https one. `ai`: one AI image, 5 AI credits (none when credits run out). */
   image: "none" | "feed" | "ai"
   /** Accounts AI posts go to. Empty: the first connected account of each platform. */
   account_ids: string[]
@@ -1164,7 +1165,7 @@ export type CreateRssFeedRequest = {
   /** `draft`: each new item becomes a draft of its text. `ai_draft`: AI writes the post, it lands as a draft for review. `ai_schedule`: AI writes the post and schedules it into the next free posting slot of the feed's accounts, so it publishes without review. When no slot is free in the next 14 days the post stays a draft and you are notified. */
   mode?: "draft" | "ai_draft" | "ai_schedule"
   template?: RssFeedTemplate
-  /** `feed`: the item's own image, when it has a public https one. `ai`: one AI image, counted against the plan's monthly AI image allowance (none once it is used up). */
+  /** `feed`: the item's own image, when it has a public https one. `ai`: one AI image, 5 AI credits (none when credits run out). */
   image?: "none" | "feed" | "ai"
   account_ids?: string[]
   daily_cap?: number
@@ -1176,7 +1177,7 @@ export type UpdateRssFeedRequest = {
   /** `draft`: each new item becomes a draft of its text. `ai_draft`: AI writes the post, it lands as a draft for review. `ai_schedule`: AI writes the post and schedules it into the next free posting slot of the feed's accounts, so it publishes without review. When no slot is free in the next 14 days the post stays a draft and you are notified. */
   mode?: "draft" | "ai_draft" | "ai_schedule"
   template?: RssFeedTemplate
-  /** `feed`: the item's own image, when it has a public https one. `ai`: one AI image, counted against the plan's monthly AI image allowance (none once it is used up). */
+  /** `feed`: the item's own image, when it has a public https one. `ai`: one AI image, 5 AI credits (none when credits run out). */
   image?: "none" | "feed" | "ai"
   account_ids?: string[]
   daily_cap?: number
@@ -2249,7 +2250,7 @@ export interface Operations {
       }
     }
   }
-  /** Get your AI image allowance */
+  /** Get your AI image count */
   "GET /media/generate-image": {
     path: never
     query: never
