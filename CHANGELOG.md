@@ -4,6 +4,12 @@ All notable changes to `@sociahive/sdk` are listed here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-26
+
+### Changed
+
+- Releases are published from GitHub Actions with npm provenance. No code changes.
+
 ## [0.2.1] - 2026-10-25
 
 ### Changed
