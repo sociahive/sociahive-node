@@ -8,7 +8,7 @@
  * doesn't churn every time an internal response shape changes.
  */
 
-import type { Platform, BulkOperationResult, BulkPostActionRequest } from './generated'
+import type { Platform, BulkOperationResult, BulkPostActionRequest, FlowPendingSummary } from './generated'
 
 /**
  * Platform ids: `KnownPlatform | (string & {})`. The public spec lists only
@@ -102,6 +102,18 @@ export interface Flow {
   created_at: string
   updated_at: string
   [key: string]: unknown
+}
+
+/** Return value of `flows.get()`: the flow with its graph. */
+export type FlowWithGraph = Flow & {
+  nodes: FlowNode[]
+  edges: FlowEdge[]
+  /** With `version: 'pending'`: the unpublished changes, or null when there are none. */
+  pending?: FlowPendingSummary | null
+  /** With `version: 'pending'`: where graph edits to this flow go (`pending` for a live flow). */
+  target?: 'live' | 'pending'
+  /** True for a live flow stored in an older format, which cannot be edited while it is on. */
+  legacyFormat?: boolean
 }
 
 export interface CreateFlowInput {

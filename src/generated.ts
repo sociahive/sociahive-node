@@ -24,6 +24,8 @@ export type ConnectedAccount = {
   created_at: string
   /** Most characters a post on this account may have. X is 280, or more for an X Premium account where long posts are on (rolling out). */
   text_limit?: number
+  /** Present and true on an Instagram account whose posts Instagram refuses until it is reconnected in Connected accounts. Its automations keep running. */
+  reconnect_to_publish?: boolean
 }
 
 export type PostAutomationDTO = {
@@ -192,10 +194,35 @@ export type FlowEnvelope = {
   flow: Record<string, unknown>
 }
 
+export type FlowPendingAuthor = {
+  kind: "user" | "agent" | "api"
+  /** Where the change came from, e.g. `web`, `api` or the AI app. */
+  surface: string
+  userId: string
+}
+
+/** Unpublished changes of a live flow (published or paused). */
+export type FlowPendingSummary = {
+  /** Version token of the unpublished changes. Send it as `expectedRev` to publish or discard exactly what you read. */
+  rev: string
+  /** The live version the changes were made on. */
+  base_v: number
+  /** When the changes were last edited (ISO 8601). */
+  updatedAt: string
+  by: FlowPendingAuthor
+  /** True when the live version changed after the changes were made; they can then only be discarded. */
+  liveChanged: boolean
+}
+
 export type FlowGraphEnvelope = {
   flow: Record<string, unknown>
   nodes: Record<string, unknown>[]
   edges: Record<string, unknown>[]
+  pending?: FlowPendingSummary & (Record<string, unknown> | null)
+  /** Only with `?version=pending` or the capability header: where your graph edits to this flow go. `pending` for a live flow. */
+  target?: "live" | "pending"
+  /** True for a live flow stored in an older format, which cannot be edited while it is on (409 `legacy_format`). */
+  legacyFormat?: boolean
 }
 
 /** PATCH /flows/{id} returns `{ success, flow }`; `warnings` (keyword conflicts) only when non-empty. */
@@ -341,6 +368,56 @@ export type CreateFlowRequest = {
   }
 }
 
+/** What publishing the unpublished changes would change. */
+export type FlowPendingChanges = {
+  /** Version token of these changes. Send it as `expectedRev` to publish them. */
+  rev: string
+  /** Same as `rev`. */
+  token: string
+  /** The live version the changes were made on. */
+  baseV: number
+  /** True when the live version changed since; the changes can then only be discarded. */
+  liveChanged: boolean
+  added: {
+    id: string
+    name: string
+    type: string
+  }[]
+  removed: {
+    id: string
+    name: string
+    type: string
+  }[]
+  changed: {
+    id: string
+    name: string
+    type: string
+  }[]
+  edgesChanged: boolean
+  triggerChanged: boolean
+  /** People partway through a step the changes remove. */
+  midFlowInRemovedSteps: number
+  createdBy: FlowPendingAuthor
+  lastBy?: FlowPendingAuthor
+  createdAt: string
+  updatedAt: string
+}
+
+export type FlowPendingPublished = {
+  flow: Record<string, unknown>
+  /** Token that puts the previous live version back while it has not expired; null when none could be issued. */
+  undo: {
+    token: string
+    expiresAtMs: number
+  } | null
+}
+
+export type FlowPendingDiscarded = {
+  discarded: true
+  /** The discarded changes are kept as a revision while it is kept. */
+  revisionId: string | null
+}
+
 /** What has worked on your published posts: format, weekday and pillar compared with your average. */
 export type ContentInsights = {
   version: string
@@ -426,6 +503,7 @@ export type Device = {
   app_version: string
   locale: string
   apns_environment?: "production" | "sandbox"
+  push_schema?: number
   last_seen_at: string
   created_at: string
 }
@@ -438,13 +516,15 @@ export type RegisterDeviceRequest = {
   locale: string
   /** Set to "sandbox" for dev/TestFlight builds. Defaults to "production". */
   apns_environment?: "production" | "sandbox"
+  /** The push payload version the build understands. 2 = review and report categories, threads and the combined badge. Omit on builds that only know the original payload. */
+  push_schema?: number
 }
 
 export type PresignUploadRequest = {
   /** Client-supplied display name. Used for logging only; server picks the storage key. */
   filename: string
-  /** Allowed MIME types only. Anything else is rejected with invalid_input. */
-  mime_type: "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/quicktime"
+  /** Allowed MIME types only. Anything else is rejected with invalid_input. A PDF is for a file in a flow message; it is refused as post media. */
+  mime_type: "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/quicktime" | "application/pdf"
   /** File size in bytes. Per-tier limits: Growth 25 MB, Scale 100 MB, Agency 500 MB. */
   size_bytes: number
 }
@@ -490,7 +570,7 @@ export type UploadFromUrlResponse = {
   url: string
   key: string
   size_bytes: number
-  mime_type: "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/quicktime"
+  mime_type: "image/jpeg" | "image/png" | "image/webp" | "video/mp4" | "video/quicktime" | "application/pdf"
 }
 
 export type RegisterActivityRequest = {
@@ -534,6 +614,10 @@ export type MeFeedResponse = {
   /** Count of failed posts plus errored flow executions in the last 24 hours */
   error_count_24h: number
   account_health: MeFeedAccountHealth[]
+  /** Posts whose current approval step waits for the caller, across every workspace they review in (not scoped by account_id). The app badge is unread_inbox_count + approvals_waiting. */
+  approvals_waiting: number
+  /** True when the count stopped before reading every candidate post: at least approvals_waiting posts wait (show it as "99+"). */
+  approvals_waiting_capped?: boolean
   generated_at: string
   /** True when this payload was served from the 60s Redis cache */
   cached: boolean
@@ -698,16 +782,21 @@ export type PostQuickStatsEnvelope = {
       published_at?: string
       /** `null` until the platform has reported numbers. */
       metrics: {
+        /** Views (plays for a video), as the client report counts them. */
         impressions: number
         reach: number
+        /** Likes + comments + saves + shares. */
         engagement: number
         likes: number
         comments: number
         shares: number
         saves: number
         clicks: number
+        /** Videos and reels only. */
         video_views?: number
       } | null
+      /** Interactions divided by reach, in percent, as in the client report. Absent without reach. */
+      engagement_rate?: number
       fetched_at: string | null
     }[]
   }
@@ -1368,6 +1457,8 @@ export interface Operations {
       timezone: string
       /** Set true, after checking X, to schedule a post with an X Article whose last publish is unconfirmed (it may already be live). Without it that answers 409 with code ARTICLE_UNCONFIRMED. */
       acknowledge_unconfirmed?: boolean
+      /** Move only a post in this status. `pending_approval`: only the time moves and the post keeps waiting for approval (never armed); a teammate whose edits need approval gets 403. */
+      require_status?: "scheduled" | "pending_approval"
     }
     response: PostEnvelope
   }
@@ -1445,7 +1536,10 @@ export interface Operations {
       /** MongoDB ObjectId (24-character hex string) */
       id: string
     }
-    query: never
+    query: {
+      /** `pending`: the unpublished changes of a live flow. */
+      version?: "pending"
+    }
     body: never
     response: FlowGraphEnvelope
   }
@@ -1555,6 +1649,40 @@ export interface Operations {
     }
     response: void
   }
+  /** Preview a live flow's unpublished changes */
+  "GET /flows/{id}/pending": {
+    path: {
+      /** MongoDB ObjectId (24-character hex string) */
+      id: string
+    }
+    query: never
+    body: never
+    response: FlowPendingChanges
+  }
+  /** Publish a live flow's unpublished changes */
+  "POST /flows/{id}/pending/publish": {
+    path: {
+      /** MongoDB ObjectId (24-character hex string) */
+      id: string
+    }
+    query: never
+    body: {
+      expectedRev: string
+    }
+    response: FlowPendingPublished
+  }
+  /** Discard a live flow's unpublished changes */
+  "POST /flows/{id}/pending/discard": {
+    path: {
+      /** MongoDB ObjectId (24-character hex string) */
+      id: string
+    }
+    query: never
+    body: {
+      expectedRev?: string
+    }
+    response: FlowPendingDiscarded
+  }
   /** Get analytics overview or per-post metrics */
   "GET /analytics": {
     path: never
@@ -1600,6 +1728,10 @@ export interface Operations {
       offset?: number | null
       /** Connected-account platform identifier */
       platform?: Platform
+      /** Matches name, email or username. */
+      search?: string
+      /** Exact match on one of the contact's platform ids, such as the sender id of a flow.triggered event. */
+      platform_user_id?: string
     }
     body: never
     response: ContactListEnvelope

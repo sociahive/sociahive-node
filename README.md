@@ -86,7 +86,7 @@ OAuth flows, see the OAuth quickstart in
 | `clientInvites` | `list`, `create`, `revoke` |
 | `rssFeeds` | `list`, `create`, `update`, `pause` |
 | `webhooks` | `list`, `create`, `update`, `delete` |
-| `flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `addNode`, `updateNode`, `addEdge`, `stats`, `collectedData`, `generate` |
+| `flows` | `list`, `get`, `create`, `update`, `delete`, `activate`, `deactivate`, `addNode`, `updateNode`, `addEdge`, `stats`, `collectedData`, `generate`, `pending`, `publishChanges`, `discardChanges` |
 | `analytics` | `get`, `export`, `contentInsights` |
 
 Some features depend on your plan: client review links, client invites and AI images need Studio or above, plugs need Creator or above. On a plan without the feature its calls throw a `SociaHiveError` with `status: 403`.
@@ -96,6 +96,23 @@ Some features depend on your plan: client review links, client invites and AI im
 ```ts
 const { data: flows } = await sh.flows.list({ platform_user_id: accounts[0].platform_user_id })
 ```
+
+Edits to a live flow (published or paused) wait as unpublished changes while
+people keep getting the live version. Preview them, then publish or discard:
+
+```ts
+const changes = await sh.flows.pending(flowId)
+console.log(changes.added, changes.removed, changes.changed, changes.midFlowInRemovedSteps)
+
+// Publish exactly what you previewed. Newer edits fail with 409 `pending_changed`.
+const { flow, undo } = await sh.flows.publishChanges(flowId, { expectedRev: changes.rev })
+
+// Or drop them; the live version stays as it is.
+await sh.flows.discardChanges(flowId, { expectedRev: changes.rev })
+```
+
+`flows.list()` items carry `hasPendingChanges`, and
+`flows.get(flowId, { version: 'pending' })` returns the unpublished graph.
 
 `posts.bulk` applies one action to up to 50 existing posts. It does not create posts; call `posts.create` for each one.
 

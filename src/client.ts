@@ -28,6 +28,7 @@ import type {
   FlowNode,
   FlowEdge,
   FlowStats,
+  FlowWithGraph,
   AnalyticsResponse,
   AnalyticsQuery,
   CreatePostInput,
@@ -158,32 +159,79 @@ export class SociaHive {
   // ── flows ───────────────────────────────────────────────────────────
 
   readonly flows = {
-    list: async (q: ListFlowsQuery): Promise<Paginated<Flow>> => {
+    list: async (q: ListFlowsQuery): Promise<Paginated<Flow & { hasPendingChanges: boolean }>> => {
       // v1 quirk: this endpoint returns { flows: [...] } not { data: [...] }.
       // Normalize for SDK consumers so every list method looks the same.
       const raw = await this.request<{ flows?: Flow[]; data?: Flow[]; pagination?: Paginated<Flow>['pagination'] }>(
         'GET', '/flows', undefined, { platform_user_id: q.platform_user_id },
       )
-      const items = (raw.data ?? raw.flows ?? []).map((f) => normalizeId(f))
+      // `pending_meta` is on a live flow that has unpublished changes.
+      const items = (raw.data ?? raw.flows ?? []).map((f) => ({
+        ...normalizeId(f),
+        hasPendingChanges: f.pending_meta != null,
+      }))
       return {
         data: items,
         pagination: raw.pagination ?? { limit: items.length, offset: 0, total: items.length },
       }
     },
-    get: async (id: string): Promise<Flow & { nodes: FlowNode[]; edges: FlowEdge[] }> => {
+    /**
+     * A flow with its nodes and edges. By default the live version; with
+     * `{ version: 'pending' }`, the unpublished changes of a live flow (the
+     * live version when there are none), plus `pending` (null when there are
+     * none) and `target`.
+     */
+    get: async (id: string, opts: { version?: 'pending' } = {}): Promise<FlowWithGraph> => {
       // v1 quirk: this endpoint returns { flow, nodes, edges } (not the
       // standard { data: ... } envelope). Merge into one object the way
       // every other resource looks.
-      const raw = await this.request<{ flow: Flow; nodes: FlowNode[]; edges: FlowEdge[] }>(
-        'GET', `/flows/${encodeURIComponent(id)}`,
+      const raw = await this.request<Api.FlowGraphEnvelope>(
+        'GET', `/flows/${encodeURIComponent(id)}`, undefined, { version: opts.version },
       )
       const flow = normalizeId(raw.flow ?? {}) as Flow
-      return {
+      const out: FlowWithGraph = {
         ...flow,
-        nodes: (raw.nodes ?? []).map(normalizeId),
-        edges: (raw.edges ?? []).map(normalizeId),
+        nodes: ((raw.nodes ?? []) as unknown as FlowNode[]).map(normalizeId),
+        edges: ((raw.edges ?? []) as unknown as FlowEdge[]).map(normalizeId),
       }
+      if ('pending' in raw) out.pending = (raw.pending ?? null) as Api.FlowPendingSummary | null
+      if (raw.target !== undefined) out.target = raw.target
+      if (raw.legacyFormat !== undefined) out.legacyFormat = raw.legacyFormat
+      return out
     },
+    /**
+     * What publishing a live flow's unpublished changes would change: steps
+     * added, removed and changed, and how many people are partway through a
+     * removed step. Fails with 404 `no_pending_changes` when there are none.
+     */
+    pending: (id: string): Promise<Api.FlowPendingChanges> =>
+      this.http.call('GET /flows/{id}/pending', { path: { id } }),
+    /**
+     * Publish a live flow's unpublished changes, with the same checks as
+     * turning a flow on. `expectedRev` is the `rev` you read from `pending()`:
+     * newer edits fail with 409 `pending_changed`, a live version that changed
+     * since with 409 `live_changed`. A failed check is a 400 with the check's
+     * `code` and the step's `nodeId` in `error.body`.
+     */
+    publishChanges: async (id: string, opts: { expectedRev: string }): Promise<Api.FlowPendingPublished> => {
+      if (!opts?.expectedRev) {
+        throw new Error('@sociahive/sdk: flows.publishChanges needs expectedRev (the `rev` from flows.pending)')
+      }
+      const out = await this.http.call('POST /flows/{id}/pending/publish', {
+        path: { id },
+        body: { expectedRev: opts.expectedRev },
+      })
+      return { ...out, flow: normalizeId(out.flow) }
+    },
+    /**
+     * Drop a live flow's unpublished changes; the live version is unchanged.
+     * With `expectedRev`, newer edits fail with 409 `pending_changed`.
+     */
+    discardChanges: (id: string, opts: { expectedRev?: string } = {}): Promise<Api.FlowPendingDiscarded> =>
+      this.http.call('POST /flows/{id}/pending/discard', {
+        path: { id },
+        body: opts.expectedRev ? { expectedRev: opts.expectedRev } : {},
+      }),
     create: (input: CreateFlowInput): Promise<Flow> =>
       this.requestUnwrapped('POST', '/flows', input),
     update: (
