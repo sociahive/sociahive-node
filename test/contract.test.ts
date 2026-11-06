@@ -94,6 +94,9 @@ const CASES: Case[] = [
   ['POST /rss-feeds', (sh) => sh.rssFeeds.create({ url: 'https://blog.test/feed', mode: 'ai_draft' }), '/rss-feeds', {}, { url: 'https://blog.test/feed', mode: 'ai_draft' }],
   ['PATCH /rss-feeds/{id}', (sh) => sh.rssFeeds.update(ID, { daily_cap: 2 }), `/rss-feeds/${ID}`, {}, { daily_cap: 2 }],
   ['POST /rss-feeds/{id}/pause', (sh) => sh.rssFeeds.pause(ID, false), `/rss-feeds/${ID}/pause`, {}, { paused: false }],
+  ['GET /flows/{id}/pending', (sh) => sh.flows.pending(ID), `/flows/${ID}/pending`],
+  ['POST /flows/{id}/pending/publish', (sh) => sh.flows.publishChanges(ID, { expectedRev: 'f1:3' }), `/flows/${ID}/pending/publish`, {}, { expectedRev: 'f1:3' }],
+  ['POST /flows/{id}/pending/discard', (sh) => sh.flows.discardChanges(ID, { expectedRev: 'f1:3' }), `/flows/${ID}/pending/discard`, {}, { expectedRev: 'f1:3' }],
   ['GET /webhooks', (sh) => sh.webhooks.list(), '/webhooks'],
   ['POST /webhooks', (sh) => sh.webhooks.create({ target_url: 'https://n8n.test/hook', events: ['post.published'], integration_type: 'n8n' }), '/webhooks', {}, { target_url: 'https://n8n.test/hook', events: ['post.published'], integration_type: 'n8n' }],
   ['PATCH /webhooks/{id}', (sh) => sh.webhooks.update(ID, { active: false }), `/webhooks/${ID}`, {}, { active: false }],
@@ -127,6 +130,85 @@ describe('flows', () => {
     assert.equal(calls[0]!.path, '/flows')
     assert.deepEqual(calls[0]!.query, { platform_user_id: '17841400000000000' })
     assert.equal(out.data[0]!.id, ID)
+  })
+})
+
+describe('flows: unpublished changes', () => {
+  const author = { kind: 'api', surface: 'api', userId: 'u1' }
+
+  it('flows.list marks flows that have unpublished changes', async () => {
+    const { sh } = mockClient(() => ({
+      body: { flows: [{ _id: ID, status: 'published', pending_meta: { rev: 3 } }, { _id: ID2, status: 'published' }] },
+    }))
+    const out = await sh.flows.list({ platform_user_id: '17841400000000000' })
+    assert.deepEqual(out.data.map((f) => f.hasPendingChanges), [true, false])
+  })
+
+  it('flows.get sends version=pending and returns the pending summary', async () => {
+    const pending = { rev: 'f1:3', base_v: 2, updatedAt: '2026-11-05T10:00:00.000Z', by: author, liveChanged: false }
+    const { sh, calls } = mockClient(() => ({
+      body: { flow: { _id: ID, status: 'published' }, nodes: [{ _id: 'n1', type: 'message' }], edges: [], pending, target: 'pending' },
+    }))
+    const out = await sh.flows.get(ID, { version: 'pending' })
+    assert.equal(calls[0]!.method, 'GET')
+    assert.equal(calls[0]!.path, `/flows/${ID}`)
+    assert.deepEqual(calls[0]!.query, { version: 'pending' })
+    assert.equal(out.id, ID)
+    assert.equal(out.nodes[0]!.id, 'n1')
+    assert.deepEqual(out.pending, pending)
+    assert.equal(out.target, 'pending')
+  })
+
+  it('flows.get without a version sends no query and adds no pending fields', async () => {
+    const { sh, calls } = mockClient(() => ({ body: { flow: { _id: ID }, nodes: [], edges: [] } }))
+    const out = await sh.flows.get(ID)
+    assert.deepEqual(calls[0]!.query, {})
+    assert.equal('pending' in out, false)
+    assert.equal('target' in out, false)
+  })
+
+  it('flows.get keeps a null pending (no unpublished changes)', async () => {
+    const { sh } = mockClient(() => ({ body: { flow: { _id: ID }, nodes: [], edges: [], pending: null, target: 'pending' } }))
+    assert.equal((await sh.flows.get(ID, { version: 'pending' })).pending, null)
+  })
+
+  it('flows.pending returns the preview', async () => {
+    const preview = {
+      rev: 'f1:3', token: 'f1:3', baseV: 2, liveChanged: false,
+      added: [{ id: 'n2', name: 'Send link', type: 'message' }], removed: [], changed: [],
+      edgesChanged: true, triggerChanged: false, midFlowInRemovedSteps: 0,
+      createdBy: author, createdAt: '2026-11-05T09:00:00.000Z', updatedAt: '2026-11-05T10:00:00.000Z',
+    }
+    const { sh } = mockClient(() => ({ body: preview }))
+    assert.deepEqual(await sh.flows.pending(ID), preview)
+  })
+
+  it('flows.publishChanges returns the flow (with id) and the undo token', async () => {
+    const { sh } = mockClient(() => ({ body: { flow: { _id: ID, status: 'published' }, undo: { token: 'u1', expiresAtMs: 1793000000000 } } }))
+    const out = await sh.flows.publishChanges(ID, { expectedRev: 'f1:3' })
+    assert.equal(out.flow.id, ID)
+    assert.deepEqual(out.undo, { token: 'u1', expiresAtMs: 1793000000000 })
+  })
+
+  it('flows.publishChanges refuses a missing expectedRev before sending', async () => {
+    const { sh, calls } = mockClient()
+    await assert.rejects(sh.flows.publishChanges(ID, { expectedRev: '' }), /expectedRev/)
+    assert.equal(calls.length, 0)
+  })
+
+  it('flows.publishChanges surfaces a failed check with its code', async () => {
+    const { sh } = mockClient(() => ({ status: 409, body: { error: 'The unpublished changes changed', code: 'pending_changed' } }))
+    await assert.rejects(sh.flows.publishChanges(ID, { expectedRev: 'f1:2' }), (err: unknown) =>
+      err instanceof SociaHiveError && err.status === 409 && err.code === 'pending_changed')
+  })
+
+  it('flows.discardChanges without expectedRev sends an empty body', async () => {
+    const { sh, calls } = mockClient(() => ({ body: { discarded: true, revisionId: ID2 } }))
+    const out = await sh.flows.discardChanges(ID)
+    assert.equal(calls[0]!.method, 'POST')
+    assert.equal(calls[0]!.path, `/flows/${ID}/pending/discard`)
+    assert.deepEqual(calls[0]!.body, {})
+    assert.deepEqual(out, { discarded: true, revisionId: ID2 })
   })
 })
 
@@ -228,7 +310,7 @@ describe('coverage', () => {
   it('every program operation in the spec has an SDK method', () => {
     const generated = readFileSync(join(__dirname, '../src/generated.ts'), 'utf8')
     const keys = Array.from(generated.matchAll(/^ {2}"((?:GET|POST|PUT|PATCH|DELETE) \/[^"]*)": \{/gm), (m) => m[1]!)
-    const program = /^(GET|POST|PUT|PATCH|DELETE) \/(media-library|media\/|uploads\/|signatures|posting-slots|find-slot|client-invites|rss-feeds|calendar|webhooks|connected-accounts$|analytics|posts(\/bulk|\/\{id\}(\/(schedule|publish|cancel|duplicate|link-clicks|review-links|plugs))?)?$)/
+    const program = /^(GET|POST|PUT|PATCH|DELETE) \/(media-library|media\/|uploads\/|signatures|posting-slots|find-slot|client-invites|rss-feeds|calendar|webhooks|connected-accounts$|analytics|posts(\/bulk|\/\{id\}(\/(schedule|publish|cancel|duplicate|link-clicks|review-links|plugs))?)?$|flows\/\{id\}\/pending)/
     const covered = new Set(CASES.map(([key]) => key))
     const missing = keys.filter((k) => program.test(k) && !covered.has(k))
     assert.deepEqual(missing, [])

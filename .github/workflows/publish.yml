@@ -1,4 +1,4 @@
-# Publishes @sociahive/sdk to npm when a version tag (v0.2.2) is pushed.
+# Publishes @sociahive/sdk to npm when a version tag (v0.3.0) is pushed.
 # Uses npm trusted publishing (OIDC), so no npm token is stored here, and npm
 # attaches a provenance statement that links the package to this commit.
 

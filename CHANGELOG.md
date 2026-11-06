@@ -4,6 +4,18 @@ All notable changes to `@sociahive/sdk` are listed here. The format follows [Kee
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-05
+
+### Added
+
+- Unpublished changes of a live flow. Edits to a published or paused flow wait as unpublished changes while people keep getting the live version.
+  - `flows.pending(id)` previews what publishing them would change: steps added, removed and changed, and how many people are partway through a removed step.
+  - `flows.publishChanges(id, { expectedRev })` publishes them with the same checks as turning a flow on, and returns the flow and an `undo` token.
+  - `flows.discardChanges(id, { expectedRev? })` drops them; the live version is unchanged.
+  - `flows.get(id, { version: 'pending' })` returns the unpublished version of the graph, with `pending` (its `rev`, or null when there are none) and `target`.
+  - `flows.list()` items carry `hasPendingChanges`.
+- Generated types: `FlowPendingChanges`, `FlowPendingPublished`, `FlowPendingDiscarded`, `FlowPendingSummary`, and the other fields the API added since 0.2.2 (for example `reconnect_to_publish` on connected accounts and PDF uploads for flow messages).
+
 ## [0.2.2] - 2026-10-26
 
 ### Changed
@@ -56,3 +68,4 @@ First release on npm.
 
 [0.1.0]: https://www.npmjs.com/package/@sociahive/sdk/v/0.1.0
 [0.2.0]: https://www.npmjs.com/package/@sociahive/sdk/v/0.2.0
+[0.3.0]: https://www.npmjs.com/package/@sociahive/sdk/v/0.3.0
